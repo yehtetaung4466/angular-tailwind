@@ -13,24 +13,26 @@ import { Router } from '@angular/router';
 })
 export class Signup {
 
-    private readonly fb = inject(FormBuilder);
-    private readonly authService = inject(AuthService); // Assuming AuthService is defined and provided elsewhere
-    private readonly router = inject(Router);
-   readonly signupForm: FormGroup = this.fb.group({
+  private readonly fb = inject(FormBuilder);
+  private readonly authService = inject(AuthService); // Assuming AuthService is defined and provided elsewhere
+  private readonly router = inject(Router);
+  readonly signupForm: FormGroup = this.fb.group({
     username: ['', [Validators.required, Validators.minLength(3)]],
+    email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
   });
 
   onSubmit() {
 
-    if(this.signupForm.invalid) {
+    if (this.signupForm.invalid) {
       this.signupForm.markAllAsTouched();
       toast.error('Please correct the errors in the form before submitting.');
       return;
     }
 
-    this.authService.signIn(
+    this.authService.signUp(
       this.signupForm.value.username,
+      this.signupForm.value.email,
       this.signupForm.value.password
     ).subscribe({
       next: () => {
@@ -42,12 +44,16 @@ export class Signup {
       }
     });
 
-    
+
   }
 
   //getter methods for form controls
   get username() {
     return this.signupForm.get('username');
+  }
+
+  get email() {
+    return this.signupForm.get('email');
   }
 
   get password() {
@@ -60,5 +66,8 @@ export class Signup {
 
   get passwordInvalid() {
     return this.password?.touched && this.password?.invalid;
+  }
+  get emailInvalid() {
+    return this.email?.touched && this.email?.invalid;
   }
 }

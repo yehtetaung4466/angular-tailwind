@@ -1,17 +1,40 @@
-// auth-guard.guard.ts
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { error } from 'better-auth/api';
 
-export const authGuard: CanActivateFn = (route, state) => {
+export const authGuard = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  if (authService.getAccessToken()) {
-    return true; // Allow navigation
+  console.log({ auth: authService.authenticated().user });
+
+
+  console.log({ auth: !!authService.authenticated().user });
+
+
+  if (!authService.authenticated().user) {
+    console.log("no user");
+
+    authService.fetchSession().subscribe(
+      {
+
+
+        error: (() => router.navigate(['/auth/login']))
+        ,
+        next: (res => {
+          console.log({ res });
+
+          if (!res.data) {
+            console.log('here');
+
+            router.navigate(['/auth/login']);
+          }
+        })
+      },
+
+    );
   }
 
-  // Redirect to signup if no token
-  router.navigate(['/signup']);
-  return false;
+  return authService.authenticated() ? true : router.parseUrl('/login');
 };

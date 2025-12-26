@@ -1,64 +1,84 @@
-// src/app/services/auth.service.ts
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { tap } from 'rxjs/operators';
-import { ApiResponse } from '../common/interfaces/apiResponse';
+import { computed, Injectable, signal } from '@angular/core';
+import { createAuthClient, Session, User } from 'better-auth/client';
+import { environment } from '../../environments/environment.development';
+import { defer, map, tap } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private accessTokenKey = 'access_token';
-  private refreshTokenKey = 'refresh_token';
+  private readonly auth = createAuthClient({
+    baseURL: environment.apiUrl,
+  });
 
-  constructor(private http: HttpClient) {}
+  private session = signal<Session | null | undefined>(null);
+  private user = signal<User | null | undefined>(null);
 
-  getAccessToken(): string | null {
-    return localStorage.getItem(this.accessTokenKey);
+  readonly authenticated = computed(() => ({
+    session: this.session(),
+    user: this.user(),
+  }));
+
+  constructor() {
+    this.fetchSession().subscribe({
+      error: () => {
+        this.session.set(null);
+        this.user.set(null);
+      },
+    });
   }
 
-  getRefreshToken(): string | null {
-    return localStorage.getItem(this.refreshTokenKey);
-  }
-
-  setTokens(access: string, refresh: string) {
-    localStorage.setItem(this.accessTokenKey, access);
-    localStorage.setItem(this.refreshTokenKey, refresh);
-  }
-
-  logout() {
-    localStorage.clear();
-  }
-
-  refreshToken() {
-    return this.http.post<any>('/auth/refresh', {
-      refreshToken: this.getRefreshToken()
-    }).pipe(
-      tap((tokens) => {
-        this.setTokens(tokens.accessToken, tokens.refreshToken);
+  fetchSession() {
+    return defer(() => this.auth.getSession()).pipe(
+      map(res => {
+        if (res.error) throw res.error;
+        return res;
+      }),
+      tap(({ data }) => {
+        this.session.set(data?.session);
+        this.user.set(data?.user);
       })
     );
   }
 
+  signIn(email: string, password: string) {
+    return defer(() =>
+      this.auth.signIn.email({ email, password })
+    ).pipe(
+      map(res => {
+        if (res.error) throw res.error;
+        return res;
+      }),
+      tap(async () => {
+        const { data, error } = await this.auth.getSession();
+        if (error) throw error;
 
-  signIn(username: string, password: string) {
-    return this.http.post<ApiResponse<authResponse>>('http://localhost:8080/auth/signup', { username, password }).pipe(
-      tap((res) => {
-        this.setTokens(res.data.accessToken, res.data.refreshToken);
+        this.session.set(data?.session);
+        this.user.set(data?.user);
       })
     );
-}
+  }
 
-login(username:string,password:string) {
-
-  return this.http.post<ApiResponse<authResponse>>('http://localhost:8080/auth/login', { username, password }).pipe(
-      tap((res) => {
-        this.setTokens(res.data.accessToken, res.data.refreshToken);
+  signUp(name: string, email: string, password: string) {
+    return defer(() =>
+      this.auth.signUp.email({ name, email, password })
+    ).pipe(
+      map(res => {
+        if (res.error) throw res.error;
+        return res;
       })
     );
-  
-}
+  }
+
+  signOut() {
+    return defer(() => this.auth.signOut()).pipe(
+      map(res => {
+        if (res.error) throw res.error;
+        return res;
+      }),
+      tap(() => {
+        this.session.set(null);
+        this.user.set(null);
+      })
+    );
+  }
 }
 
-interface authResponse {
-  accessToken: string;
-  refreshToken: string;
-}
